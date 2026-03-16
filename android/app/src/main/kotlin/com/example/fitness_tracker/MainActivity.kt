@@ -8,6 +8,9 @@ import android.hardware.SensorManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // 1. 繼承 SensorEventListener 才能讓這個類別具有「聽力」
 class MainActivity : FlutterActivity(), SensorEventListener {
@@ -20,6 +23,7 @@ class MainActivity : FlutterActivity(), SensorEventListener {
         super.configureFlutterEngine(flutterEngine)
 
         loadData() // <--- 1. 啟動時先讀取舊數據
+        checkNewDay() // <--- 啟動時檢查是否跨日
 
 
         // 2. 初始化傳感器管理員，並指定要聽「加速度計 (Accelerometer)」
@@ -67,6 +71,7 @@ class MainActivity : FlutterActivity(), SensorEventListener {
 
 
             if(delta > 2.0f) {
+                checkNewDay() // <--- 增加步數前先確認今天還是今天
                 dailySteps ++
                 saveData() // <--- 2. 每加一步就存一次，保證資料不丟失
             }
@@ -88,4 +93,30 @@ class MainActivity : FlutterActivity(), SensorEventListener {
         dailySteps = prefs.getInt("daily_steps", 0)
     }
 
+    private fun getCurrentDate(): String {
+        //格式化日期
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        return sdf.format(Date())
+    }
+
+    private fun checkNewDay() {
+        val prefs = getSharedPreferences("FitnessData", Context.MODE_PRIVATE)
+        val lastDate = prefs.getString("last_date", "") // 讀取上次存檔的日期
+        val today = getCurrentDate()
+
+        // 如果上次日期不是空的，且跟今天不一樣 -> 代表「換天了」
+        if (lastDate != "" && lastDate != today) {
+
+            // 【核心動作 A】結算昨天：將昨天的步數存入歷史 (第三階段會實作具體存檔)
+            // 這裡我們暫時先印出 Log 方便測試
+            println("偵測到換天！昨天的日期是 $lastDate，步數是 $dailySteps")
+
+            // 【核心動作 B】重置今天：步數歸零
+            dailySteps = 0
+            saveData()
+        }
+
+        // 不管有沒有換天，都要更新「最後開啟日期」為今天
+        prefs.edit().putString("last_date", today).apply()
+    }
 }
