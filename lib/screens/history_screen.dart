@@ -1,54 +1,73 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-class HistoryScreen extends StatelessWidget {
-  // 先寫一組「假資料」來模擬從原生端拿到的數據
-  // 每一筆資料包含：日期、步數、達標率
-  final List<Map<String, dynamic>> dummyHistory = [
-    {"date": "2026-03-12", "steps": 8500, "goal": 10000},
-    {"date": "2026-03-11", "steps": 12000, "goal": 10000},
-    {"date": "2026-03-10", "steps": 4300, "goal": 10000},
-    {"date": "2026-03-09", "steps": 10500, "goal": 10000},
-  ];
+class HistoryScreen extends StatefulWidget {
+  @override
+  _HistoryScreenState createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  static const platform = MethodChannel('com.example.fitness/steps');
+
+  // 1. 宣告一個變數來儲存 Future 實體
+  late Future<List<dynamic>> _historyFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    // 2. 在初始化時就執行請求，並保存在變數中
+    // 這樣就算 build 跑 100 次，_historyFuture 依然是同一個，不會重新請求
+    _historyFuture = _fetchHistory();
+  }
+
+  Future<List<dynamic>> _fetchHistory() async {
+    try {
+      final String jsonString = await platform.invokeMethod('getHistory');
+      return jsonDecode(jsonString);
+    } catch (e) {
+      print("讀取歷史失敗: $e");
+      return [];
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: Text("歷史紀錄"),
-        backgroundColor: Colors.transparent,
-      ),
-      body: ListView.builder(
-        padding: EdgeInsets.all(16),
+      appBar: AppBar(title: Text("步行歷史紀錄")),
+      body: FutureBuilder<List<dynamic>>(
+        // 3. 這裡改用剛才存好的變數，不要直接呼叫方法
+        future: _historyFuture, 
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
+          
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return Center(child: Text("尚無紀錄，明天再來看看吧！"));
+          }
 
-        itemCount: dummyHistory.length, // 告訴 Flutter 總共有幾筆
-        itemBuilder: (context, index) {
-          final record = dummyHistory[index]; // 取出當前這筆資料
-          double progress = record['steps'] / record['goal']; // 計算達標率
-          bool isGoalReached = progress >= 1.0;
+          final historyList = snapshot.data!.reversed.toList();
 
-          return Card(
-            color: Colors.white.withValues(alpha: 0.05),
-            margin: EdgeInsets.only(bottom: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: isGoalReached ? Colors.greenAccent : Colors.white12,
-                child: Icon(
-                  isGoalReached ? Icons.check : Icons.directions_walk,
-                  color: isGoalReached ? Colors.black : Colors.white38,
+          return ListView.builder(
+            itemCount: historyList.length,
+            itemBuilder: (context, index) {
+              final item = historyList[index];
+              return Card(
+                margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: ListTile(
+                  leading: Icon(Icons.calendar_today, color: Colors.greenAccent),
+                  title: Text(item['date'] ?? "未知日期"),
+                  trailing: Text(
+                    "${item['steps']} 步",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                 ),
-              ),
-              title: Text(record['date'], style: TextStyle(color: Colors.white70)),
-              subtitle: Text("步數: ${record['steps']}", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-              trailing: Text(
-                "${(progress* 100).toInt()}%",
-                style: TextStyle(color: isGoalReached ? Colors.greenAccent : Colors.white38),
-              )
-            ),
+              );
+            },
           );
         },
-      )
+      ),
     );
   }
 }

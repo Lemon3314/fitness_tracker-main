@@ -5,9 +5,12 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import org.json.JSONArray
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -51,6 +54,11 @@ class MainActivity : FlutterActivity(), SensorEventListener {
                     dailySteps += steps?:0
                     saveData()
                     result.success(dailySteps)
+                }
+                "getHistory" -> {
+                    val prefs = getSharedPreferences("FitnessData", Context.MODE_PRIVATE)
+                    val historyString = prefs.getString("history_list", "[]")
+                    result.success(historyString)
                 }
                 else -> result.notImplemented()
             }
@@ -107,6 +115,7 @@ class MainActivity : FlutterActivity(), SensorEventListener {
         // 如果上次日期不是空的，且跟今天不一樣 -> 代表「換天了」
         if (lastDate != "" && lastDate != today) {
 
+            saveToHistory(lastDate,dailySteps)
             // 【核心動作 A】結算昨天：將昨天的步數存入歷史 (第三階段會實作具體存檔)
             // 這裡我們暫時先印出 Log 方便測試
             println("偵測到換天！昨天的日期是 $lastDate，步數是 $dailySteps")
@@ -118,5 +127,27 @@ class MainActivity : FlutterActivity(), SensorEventListener {
 
         // 不管有沒有換天，都要更新「最後開啟日期」為今天
         prefs.edit().putString("last_date", today).apply()
+    }
+
+    private fun saveToHistory(date: String?, steps: Int) {
+        val prefs = getSharedPreferences("FitnessData", Context.MODE_PRIVATE)
+
+        val historyString  = prefs.getString("history_list", "[]") ?: "[]"
+
+        try {
+            val jsonArray = JSONArray(historyString)
+
+            val newRecord = JSONObject()
+            newRecord.put("date", date)
+            newRecord.put("steps", steps)
+
+            jsonArray.put(newRecord)
+
+            prefs.edit().putString("history_list", jsonArray.toString()).apply()
+
+            Log.d("StepTracker", "歷史資料更新成功，目前有 ${jsonArray.length()}筆資料")
+        } catch (e: Exception) {
+            Log.e("StepTracker", "JSON 處理出錯: ${e.message}")
+        }
     }
 }
