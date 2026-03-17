@@ -23,8 +23,19 @@ class HomeScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 50),
-            const Text("步數追蹤器", style: TextStyle(fontSize: 24, color: Colors.white)),
-            const SizedBox(height: 30),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween, // 左右對齊
+              children: [
+                const Text("步數追蹤器", style: TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.bold)),
+                IconButton(
+                  icon: const Icon(Icons.settings_input_component, color: Colors.white54),
+                  onPressed: () {
+                    // 打開 Scaffold 的右側清單
+                    Scaffold.of(context).openEndDrawer(); 
+                  },
+                )
+              ],
+            ),
             _buildProgressRing(),
             const SizedBox(height: 50),
             _buildStatsRow(),
@@ -73,7 +84,9 @@ class HomeScreen extends StatelessWidget {
             backgroundColor: Colors.white12,
           ),
         ),
-        Column(mainAxisSize: MainAxisSize.min, children: [
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
           Text("$steps", style: const TextStyle(fontSize: 50, fontWeight: FontWeight.bold, color: Colors.white)),
           Text("目標: $stepGoal", style: const TextStyle(color: Colors.white70)),
         ])

@@ -60,6 +60,36 @@ class MainActivity : FlutterActivity(), SensorEventListener {
                     val historyString = prefs.getString("history_list", "[]")
                     result.success(historyString)
                 }
+                "setSteps" -> {
+                    // 取得 Flutter 傳來的指定步數
+                    val steps = call.argument<Int>("steps") ?: 0
+                    dailySteps = steps
+                    saveData() // 覆寫原本的進度
+                    result.success(dailySteps)
+                }
+                "simulateNextDay" -> {
+                    // 抓取 Flutter 傳來的日期
+                    val targetDate = call.argument<String>("date") ?: "1999-01-01"
+
+                    // --- 關鍵修改點 ---
+                    // 直接呼叫我們剛寫好的存檔方法，把「當前步數」存入「指定日期」
+                    saveHistoryEntry(targetDate, dailySteps)
+
+                    // 存完後將當前步數歸零
+                    dailySteps = 0
+
+                    // 同步更新當前步數到 Prefs，並更新最後存檔日期為「今天」
+                    // 這樣可以防止 checkNewDay 在重啟 App 時又執行一次自動存檔
+                    val prefs = getSharedPreferences("FitnessData", Context.MODE_PRIVATE)
+                    val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+
+                    prefs.edit()
+                        .putInt("daily_steps", 0)
+                        .putString("last_date", today)
+                        .commit() // 使用 commit 確保資料立即寫入
+
+                    result.success(0) // 回傳 0 給 Flutter 告知畫面該歸零了
+                }
                 else -> result.notImplemented()
             }
         }
@@ -148,6 +178,42 @@ class MainActivity : FlutterActivity(), SensorEventListener {
             Log.d("StepTracker", "歷史資料更新成功，目前有 ${jsonArray.length()}筆資料")
         } catch (e: Exception) {
             Log.e("StepTracker", "JSON 處理出錯: ${e.message}")
+        }
+    }
+
+    private fun saveHistoryEntry(date: String, steps: Int) {
+        val prefs = getSharedPreferences("FitnessData", Context.MODE_PRIVATE)
+
+        // 1. 取得目前的歷史紀錄字串，若無則預設為空陣列 "[]"
+        val historyString = prefs.getString("history_list", "[]") ?: "[]"
+
+        try {
+            val historyArray = JSONArray(historyString)
+
+            // 2. 檢查是否已經有同日期的紀錄，如果有就覆蓋，沒有就新增
+            var found = false
+            for (i in 0 until historyArray.length()) {
+                val item = historyArray.getJSONObject(i)
+                if (item.getString("date") == date) {
+                    item.put("steps", steps) // 找到同日期的，更新步數
+                    found = true
+                    break
+                }
+            }
+
+            if (!found) {
+                // 3. 建立新的紀錄物件並放入陣列
+                val newEntry = JSONObject()
+                newEntry.put("date", date)
+                newEntry.put("steps", steps)
+                historyArray.put(newEntry)
+            }
+
+            // 4. 將更新後的陣列轉回字串並存檔
+            prefs.edit().putString("history_list", historyArray.toString()).apply()
+
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }
