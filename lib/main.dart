@@ -106,7 +106,9 @@ class _MyStepTrackerState extends State<MyStepTracker> {
         onAdd: _AddSteps,     // 傳入邏輯方法
       ), // 原本的首頁 UI
       BadgeScreen(steps: _steps), // 勳章頁：把目前的步數傳進去
-      AnalysisScreen(), // <--- 新增分析頁面
+      
+      // 傳入一個布林值，告訴分析頁它現在是不是「主角」
+      AnalysisScreen(isCurrentPage: _curIndex == 2),
       HistoryScreen(), // 歷史頁（目前是空的）
     ];
 
@@ -155,7 +157,7 @@ class _MyStepTrackerState extends State<MyStepTracker> {
             _curIndex = index; // 點擊時更新索引，觸發畫面重繪
           });
         },
-        
+
         selectedItemColor: Colors.greenAccent,
         unselectedItemColor: Colors.white24,
         type: BottomNavigationBarType.fixed,

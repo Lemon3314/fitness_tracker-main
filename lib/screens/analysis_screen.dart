@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 import 'dart:async'; // 1. 必須引入這個才能使用 Timer
 
 class AnalysisScreen extends StatefulWidget {
+  final bool isCurrentPage; // 接收來自 main 的狀態
+  AnalysisScreen({this.isCurrentPage = false});
+
   @override
   _AnalysisScreenState createState() => _AnalysisScreenState();
 }
@@ -51,6 +54,19 @@ class _AnalysisScreenState extends State<AnalysisScreen> with SingleTickerProvid
     _controller.dispose(); // 4. 銷毀控制器避免耗電
     super.dispose();
   }
+
+  @override
+  void didUpdateWidget(covariant AnalysisScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // 關鍵邏輯：
+    // 如果「原本不是當前頁」變成「現在是當前頁」，就重播動畫
+    if (!oldWidget.isCurrentPage && widget.isCurrentPage) {
+      _controller.forward(from: 0.0); 
+      _fetchHistory(); // 順便重新抓取最新數據
+    }
+  }
+  
 
   Future<void> _fetchHistory() async {
     try {
