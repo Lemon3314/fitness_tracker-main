@@ -10,6 +10,7 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   static const platform = MethodChannel('com.example.fitness/steps');
+  
   late Future<List<dynamic>> _historyFuture;
 
   @override
@@ -49,12 +50,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
         onRefresh: _handleRefresh,
         color: Colors.greenAccent,
         child: FutureBuilder<List<dynamic>>(
-          future: _historyFuture,
-          builder: (context, snapshot) {
+
+          future: _historyFuture,  // 1. 綁定你的「號碼牌」（非同步任務）
+          builder: (context, snapshot) { // 2. 當狀態改變時，這個 builder 會重新執行
+            
+            // 情況 A：還在等（轉圈圈）
             if (snapshot.connectionState == ConnectionState.waiting) {
               return Center(child: CircularProgressIndicator());
             }
 
+            // 情況 B：出錯或是沒資料（顯示提示文字）
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
               return ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -65,6 +70,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               );
             }
 
+            // 情況 C：大功告成（把資料 snapshot.data 拿出來用）
             final historyList = snapshot.data!.reversed.toList();
 
             return ListView.builder(

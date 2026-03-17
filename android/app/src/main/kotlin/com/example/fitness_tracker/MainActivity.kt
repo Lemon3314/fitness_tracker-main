@@ -55,10 +55,39 @@ class MainActivity : FlutterActivity(), SensorEventListener {
                     saveData()
                     result.success(dailySteps)
                 }
+                // MainActivity.kt 內的 getHistory 區塊
                 "getHistory" -> {
                     val prefs = getSharedPreferences("FitnessData", Context.MODE_PRIVATE)
-                    val historyString = prefs.getString("history_list", "[]")
-                    result.success(historyString)
+                    val historyString = prefs.getString("history_list", "[]") ?: "[]"
+
+                    try {
+                        val jsonArray = JSONArray(historyString)
+                        val today = getCurrentDate() // 取得今天日期 yyyy-MM-dd
+
+                        // 檢查歷史紀錄中是否已經有今天的資料（避免重複顯示）
+                        var todayFound = false
+                        for (i in 0 until jsonArray.length()) {
+                            val item = jsonArray.getJSONObject(i)
+                            if (item.getString("date") == today) {
+                                // 如果今天已經有紀錄（可能是剛結算），就更新它為最新即時步數
+                                item.put("steps", dailySteps)
+                                todayFound = true
+                                break
+                            }
+                        }
+
+                        // 如果歷史紀錄沒找到今天，就手動新增一個進去回傳給 Flutter
+                        if (!todayFound) {
+                            val todayRecord = JSONObject()
+                            todayRecord.put("date", today)
+                            todayRecord.put("steps", dailySteps)
+                            jsonArray.put(todayRecord)
+                        }
+
+                        result.success(jsonArray.toString()) // 回傳包含「今天即時步數」的完整清單
+                    } catch (e: Exception) {
+                        result.success(historyString) // 出錯時回傳原始字串作為保險
+                    }
                 }
                 "setSteps" -> {
                     // 取得 Flutter 傳來的指定步數

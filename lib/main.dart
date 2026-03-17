@@ -149,11 +149,13 @@ class _MyStepTrackerState extends State<MyStepTracker> {
       // 底部導航欄
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _curIndex,
+
         onTap: (index) {
           setState(() {
             _curIndex = index; // 點擊時更新索引，觸發畫面重繪
           });
         },
+        
         selectedItemColor: Colors.greenAccent,
         unselectedItemColor: Colors.white24,
         type: BottomNavigationBarType.fixed,
@@ -211,6 +213,7 @@ class _MyStepTrackerState extends State<MyStepTracker> {
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
     );
+  
 
     if (picked != null) {
       // 格式化為 yyyy-MM-dd

@@ -2,22 +2,54 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async'; // 1. 必須引入這個才能使用 Timer
 
 class AnalysisScreen extends StatefulWidget {
   @override
   _AnalysisScreenState createState() => _AnalysisScreenState();
 }
 
-class _AnalysisScreenState extends State<AnalysisScreen> {
+// 1. 加入 SingleTickerProviderStateMixin 才能使用動畫控制器
+class _AnalysisScreenState extends State<AnalysisScreen> with SingleTickerProviderStateMixin{
   static const platform = MethodChannel('com.example.fitness/steps');
   
   List<dynamic> _history = [];
   int _selectedTab = 0; // 0 代表 7天 (本週), 1 代表 30天 (本月)
 
+// 2. 定義動畫相關變數
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  Timer? _refreshTimer;
+
   @override
   void initState() {
     super.initState();
     _fetchHistory();
+
+    // 3. 初始化動畫控制器 (設定 800 毫秒讓生長感更明顯)
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 800),
+    );
+    
+    // 使用節點曲線 (Cubic)，讓動畫有「彈出」的生動感
+    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeOutQuart);
+
+    _fetchHistory();
+    _controller.forward(); // 進入頁面時啟動動畫
+
+    // 定時刷新 (保留之前的邏輯)
+    _refreshTimer = Timer.periodic(Duration(seconds: 3), (timer) {
+      if (mounted) _fetchHistory();
+    });
+
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    _controller.dispose(); // 4. 銷毀控制器避免耗電
+    super.dispose();
   }
 
   Future<void> _fetchHistory() async {
@@ -30,6 +62,16 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     } catch (e) {
       print("分析頁面讀取歷史失敗: $e");
     }
+  }
+
+  // 修改切換 Tab 的邏輯
+  void _handleTabChange(int index) {
+    if (_selectedTab == index) return;
+    setState(() {
+      _selectedTab = index;
+    });
+    // 5. 切換 Tab 時，將動畫重設為 0 並重新播放
+    _controller.forward(from: 0.0);
   }
 
   // --- 核心邏輯：產生包含「空缺補零」的連續日期資料 ---
@@ -111,8 +153,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       ),
       child: Row(
         children: [
-          _buildTabButton(title: "這禮拜", index: 0),
-          _buildTabButton(title: "這個月", index: 1),
+          _buildTabButton(title: "近 7 日", index: 0),
+          _buildTabButton(title: "近 30 日", index: 1),
         ],
       ),
     );
@@ -122,7 +164,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     bool isSelected = _selectedTab == index;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _selectedTab = index),
+        onTap: () => _handleTabChange(index),
         child: Container(
           padding: EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
@@ -190,74 +232,72 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
   // --- 3. 純手工繪製長條圖 ---
   Widget _buildChart(List<Map<String, dynamic>> data, bool isMonthView) {
-    int maxSteps = data.fold(1, (max, e) => (e['steps'] as int) > max ? (e['steps'] as int) : max);
-    if (maxSteps == 0) maxSteps = 1; 
+  int maxSteps = data.fold(1, (max, e) => (e['steps'] as int) > max ? (e['steps'] as int) : max);
+  if (maxSteps == 0) maxSteps = 1;
 
-    return Container(
-      height: 220,
-      margin: EdgeInsets.symmetric(horizontal: 20),
-      padding: EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        // 30天用 spaceBetween 撐滿，7天用 spaceEvenly 讓間距更舒適
-        mainAxisAlignment: isMonthView ? MainAxisAlignment.spaceBetween : MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: List.generate(data.length, (index) {
-          
-          var item = data[index];
-          int steps = item['steps'] as int;
-          double barHeight = (steps / maxSteps) * 140; // 容器高度最高 140
+  // 使用 AnimatedBuilder 監聽動畫狀態，每一幀都會重新繪製
+  return AnimatedBuilder(
+    animation: _animation,
+    builder: (context, child) {
+      return Container(
+        height: 220,
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisAlignment: isMonthView ? MainAxisAlignment.spaceBetween : MainAxisAlignment.spaceEvenly,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: List.generate(data.length, (index) {
+            var item = data[index];
+            int steps = item['steps'] as int;
+            
+            // 核心動畫邏輯：將目標高度乘以動畫當前值 (0.0 -> 1.0)
+            double targetHeight = (steps / maxSteps) * 140;
+            double animatedHeight = targetHeight * _animation.value;
 
-          // UI 邏輯判定
-          // 30天模式：只在頭、尾、以及每隔 5 天顯示一次日期標籤
-          bool showDateLabel = !isMonthView || (index == 0 || index == data.length - 1 || index % 6 == 0);
-          // 30天模式：隱藏頂部的數字，避免 30 個數字擠在一起看不清
-          bool showStepNumber = !isMonthView;
-          
-          // 將日期從 yyyy-MM-dd 截斷成 MM/dd
-          String displayDate = item['date'].toString().substring(5).replaceFirst('-', '/');
+            bool showDateLabel = !isMonthView || (index == 0 || index == data.length - 1 || index % 6 == 0);
+            bool showStepNumber = !isMonthView;
+            String displayDate = item['date'].toString().substring(5).replaceFirst('-', '/');
 
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              // 柱子頂部的步數數字
-              if (showStepNumber) 
-                Text("$steps", style: TextStyle(fontSize: 10, color: Colors.white70)),
-              
-              SizedBox(height: 4),
-              
-              // 實體柱子
-              Container(
-                width: isMonthView ? 6 : 24, // 30天柱體變細 (6px)，7天較粗 (24px)
-                height: barHeight > 0 ? barHeight : 2, // 就算為 0 也留 2px 的底色
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: steps > 0 
-                        ? [Colors.greenAccent, Colors.teal] 
-                        // 如果步數是 0，柱子就變成暗灰色
-                        : [Colors.white10, Colors.white10], 
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (showStepNumber)
+                  // 數字部分加上透明度動畫，隨柱體上升慢慢浮現
+                  Opacity(
+                    opacity: _animation.value,
+                    child: Text("$steps", style: const TextStyle(fontSize: 10, color: Colors.white70)),
                   ),
-                  borderRadius: BorderRadius.circular(isMonthView ? 3 : 6),
+                const SizedBox(height: 4),
+                Container(
+                  width: isMonthView ? 6 : 24,
+                  // 動畫高度應用在此
+                  height: animatedHeight > 0 ? animatedHeight : 2,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: steps > 0 
+                          ? [Colors.greenAccent, Colors.teal] 
+                          : [Colors.white10, Colors.white10],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                    borderRadius: BorderRadius.circular(isMonthView ? 3 : 6),
+                  ),
                 ),
-              ),
-              
-              SizedBox(height: 8),
-              
-              // 柱子底部的日期標籤
-              if (showDateLabel)
-                Text(displayDate, style: TextStyle(fontSize: 9, color: Colors.white54))
-              else
-                // 如果不顯示標籤，也要保留高度位置，避免柱體往下沉
-                SizedBox(height: 12, width: isMonthView ? 6 : 24), 
-            ],
-          );
-        }),
-      ),
-    );
-  }
+                const SizedBox(height: 8),
+                if (showDateLabel)
+                  Text(displayDate, style: const TextStyle(fontSize: 9, color: Colors.white54))
+                else
+                  SizedBox(height: 12, width: isMonthView ? 6 : 24),
+              ],
+            );
+          }),
+        ),
+      );
+    },
+  );
+}
 }
