@@ -40,7 +40,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
 
-// ... 前面 initState 與 _fetchHistory 保持不變
 
   @override
   Widget build(BuildContext context) {
