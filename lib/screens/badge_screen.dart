@@ -229,6 +229,11 @@ class _BadgeDetailDialogState extends State<BadgeDetailDialog> with TickerProvid
   late AnimationController _entryController;
   late Animation<double> _flipAnimation;
 
+  // [新增] 用於處理手勢放開後，平滑回正的控制器與動畫
+  late AnimationController _tiltResetController;
+  late Animation<double> _tiltXAnimation;
+  late Animation<double> _tiltYAnimation;
+
   // 用於控制 3D 傾斜的角度 (這不是動畫，是根據手勢即時計算的)
   double _tiltX = 0.0;
   double _tiltY = 0.0;
@@ -247,6 +252,20 @@ class _BadgeDetailDialogState extends State<BadgeDetailDialog> with TickerProvid
       CurvedAnimation(parent: _entryController, curve: Curves.elasticOut), // 使用彈性曲線
     );
 
+    // [新增] 初始化回正動畫控制器 (時間設短一點，反應更俐落)
+    _tiltResetController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+
+    // [新增] 監聽回正動畫，即時更新傾斜角度並觸發畫面重繪
+    _tiltResetController.addListener(() {
+      setState(() {
+        _tiltX = _tiltXAnimation.value;
+        _tiltY = _tiltYAnimation.value;
+      });
+    });
+
     // 延遲一點點開始翻轉，等 Hero 動畫飛到位
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) _entryController.forward();
@@ -256,11 +275,14 @@ class _BadgeDetailDialogState extends State<BadgeDetailDialog> with TickerProvid
   @override
   void dispose() {
     _entryController.dispose();
+    _tiltResetController.dispose(); // [新增] 釋放回正控制器的資源，避免 Memory Leak
     super.dispose();
   }
 
   // 處理手勢滑動，計算傾斜角度
   void _handlePanUpdate(DragUpdateDetails details, Size size) {
+    _tiltResetController.stop(); // [新增] 如果動畫回正到一半，手指又摸上去，立刻停止回正
+
     setState(() {
       // 根據手指在螢幕上的相對位置計算 X 和 Y 的傾斜
       // offset.dx / width -> 得到 0~1 之間的比例，再轉為 -0.5 ~ 0.5，最後乘以最大角度
@@ -271,18 +293,19 @@ class _BadgeDetailDialogState extends State<BadgeDetailDialog> with TickerProvid
 
   // 手指抬起，平滑還原
   void _handlePanEnd(DragEndDetails details) {
-    // 這裡我們不用動畫控制器，直接用簡單的遞減，讓它看起來像有慣性
-    Timer.periodic(const Duration(milliseconds: 16), (timer) {
-      setState(() {
-        _tiltX *= 0.8; // 每次減 20%
-        _tiltY *= 0.8;
-        if (_tiltX.abs() < 0.01 && _tiltY.abs() < 0.01) {
-          _tiltX = 0;
-          _tiltY = 0;
-          timer.cancel(); // 停止計時器
-        }
-      });
-    });
+    // 這裡我們不用動畫控制器，直接用簡單的遞減，讓它看起來像有慣性 
+    // [修改備註]：為了提升效能與避免掉幀，這裡已經將原本的 Timer 邏輯升級為原生的 Tween 動畫
+
+    // [新增] 設定從「當前手指放開的角度」回到「0 (正中心)」的補間動畫
+    _tiltXAnimation = Tween<double>(begin: _tiltX, end: 0.0).animate(
+      CurvedAnimation(parent: _tiltResetController, curve: Curves.easeOutBack), // easeOutBack 會有一點彈性質感
+    );
+    _tiltYAnimation = Tween<double>(begin: _tiltY, end: 0.0).animate(
+      CurvedAnimation(parent: _tiltResetController, curve: Curves.easeOutBack),
+    );
+
+    // [新增] 觸發回正動畫，確保每次都從頭開始播放
+    _tiltResetController.forward(from: 0.0);
   }
 
   @override
@@ -301,7 +324,7 @@ class _BadgeDetailDialogState extends State<BadgeDetailDialog> with TickerProvid
             children: [
               // 動畫核心：AnimatedBuilder
               AnimatedBuilder(
-                animation: _entryController,
+                animation: Listenable.merge([_entryController, _tiltResetController]), // [修改] 同時監聽進場與回正兩個動畫控制器
                 builder: (context, child) {
                   // 組合兩個 Transform：一個是用於進場翻轉，一個是用於 3D 傾斜
                   return Transform(
@@ -383,21 +406,23 @@ class BadgeVisual extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         // 1. 質感漸層 (金屬質感)
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isUnlocked
-              ? [
-                  baseColor.withValues(alpha: 0.4),
-                  baseColor, // 主色
-                  baseColor.withValues(alpha: 0.2), // 營造高光和陰影
-                ]
-              : [
-                  Colors.white.withValues(alpha: 0.05),
-                  Colors.white.withValues(alpha: 0.15), // 鎖定時為灰色漸層
-                ],
-          stops: const [0.1, 0.5, 0.9],
-        ),
+        // 修改 BadgeVisual 內的 gradient 部分
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: isUnlocked
+            ? [
+                baseColor.withValues(alpha: 0.4),
+                baseColor, // 主色
+                baseColor.withValues(alpha: 0.2), 
+              ]
+            : [
+                Colors.white.withValues(alpha: 0.05),
+                Colors.white.withValues(alpha: 0.10), // ✅ 補上中間的過渡色，讓陣列長度保持為 3
+                Colors.white.withValues(alpha: 0.15), 
+              ],
+        stops: const [0.1, 0.5, 0.9],
+      ),
         // 2. 邊框
         border: Border.all(
           color: isUnlocked ? baseColor.withValues(alpha: 0.8) : Colors.white12,

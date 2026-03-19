@@ -104,6 +104,7 @@ class _MyStepTrackerState extends State<MyStepTracker> {
         stepGoal: _stepGoal,
         onReset: _resetSteps, // 傳入邏輯方法
         onAdd: _AddSteps,     // 傳入邏輯方法
+        isActive: _curIndex == 0,
       ), // 原本的首頁 UI
       BadgeScreen(steps: _steps), // 勳章頁：把目前的步數傳進去
       

@@ -73,8 +73,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
             final historyList = snapshot.data!.reversed.toList();
 
             return ListView.builder(
+
               physics: const AlwaysScrollableScrollPhysics(),
               itemCount: historyList.length,
+
               itemBuilder: (context, index) {
                 final item = historyList[index];
                 
@@ -88,15 +90,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   child: ListTile(
                     contentPadding: EdgeInsets.all(16),
+
                     leading: CircleAvatar(
                       backgroundColor: Colors.greenAccent.withValues(alpha: 0.1),
                       child: Icon(Icons.history, color: Colors.greenAccent),
                     ),
+                    
                     // 標題顯示日期
                     title: Text(
                       item['date'] ?? "未知日期",
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
+                    
                     // --- 2. 副標題顯示距離與熱量 ---
                     subtitle: Padding(
                       padding: const EdgeInsets.only(top: 8.0),
@@ -105,6 +110,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         style: TextStyle(color: Colors.white60, fontSize: 13),
                       ),
                     ),
+                    
                     // 右側顯示大大的步數
                     trailing: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
