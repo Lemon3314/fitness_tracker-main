@@ -6,10 +6,10 @@ import 'dart:async'; // 1. 必須引入這個才能使用 Timer
 
 class AnalysisScreen extends StatefulWidget {
   final bool isCurrentPage; // 接收來自 main 的狀態
-  AnalysisScreen({this.isCurrentPage = false});
+  const AnalysisScreen({super.key,this.isCurrentPage = false});
 
   @override
-  _AnalysisScreenState createState() => _AnalysisScreenState();
+  State<AnalysisScreen> createState() => _AnalysisScreenState();
 }
 
 // 1. 加入 SingleTickerProviderStateMixin 才能使用動畫控制器
@@ -137,6 +137,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> with SingleTickerProvid
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+
           children: [
             SizedBox(height: 20),
             _buildToggleBar(), // 上方的 7天/30天 切換按鈕
@@ -158,6 +159,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> with SingleTickerProvid
       ),
     );
   }
+
 
   // --- 1. 切換按鈕 UI ---
   Widget _buildToggleBar() {
@@ -249,6 +251,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> with SingleTickerProvid
   // --- 3. 純手工繪製長條圖 ---
   Widget _buildChart(List<Map<String, dynamic>> data, bool isMonthView) {
   int maxSteps = data.fold(1, (max, e) => (e['steps'] as int) > max ? (e['steps'] as int) : max);
+  
   if (maxSteps == 0) maxSteps = 1;
 
   // 使用 AnimatedBuilder 監聽動畫狀態，每一幀都會重新繪製
@@ -266,6 +269,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> with SingleTickerProvid
         child: Row(
           mainAxisAlignment: isMonthView ? MainAxisAlignment.spaceBetween : MainAxisAlignment.spaceEvenly,
           crossAxisAlignment: CrossAxisAlignment.end,
+
+          
           children: List.generate(data.length, (index) {
             var item = data[index];
             int steps = item['steps'] as int;

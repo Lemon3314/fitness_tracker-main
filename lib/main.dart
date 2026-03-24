@@ -13,7 +13,7 @@ void main() => runApp(MaterialApp(
 
 class MyStepTracker extends StatefulWidget {
   @override
-  _MyStepTrackerState createState() => _MyStepTrackerState();
+  State<MyStepTracker> createState() => _MyStepTrackerState();
 }
 
 class _MyStepTrackerState extends State<MyStepTracker> {

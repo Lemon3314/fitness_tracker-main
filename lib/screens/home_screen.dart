@@ -22,6 +22,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+
+  
   late AnimationController _controller;
   late Animation<double> _animation;
   double _lastProgress = 0.0; // 記錄上一次的進度位置
@@ -37,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     // 初始動畫：從 0 到當前進度
     double currentProgress = widget.stepGoal > 0 ? widget.steps / widget.stepGoal : 0;
+    
     _animation = Tween<double>(begin: 0, end: currentProgress).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
     );
