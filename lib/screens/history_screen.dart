@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class HistoryScreen extends StatefulWidget {
-  
-  const HistoryScreen({super.key});
+  final bool isActive;
+  const HistoryScreen({super.key, required this.isActive});
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
@@ -19,6 +19,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
   void initState() {
     super.initState();
     _historyFuture = _fetchHistory();
+  }
+
+  @override
+  void didUpdateWidget(covariant HistoryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if(!oldWidget.isActive && widget.isActive) {
+      _historyFuture = _fetchHistory();
+    }
   }
 
   Future<List<dynamic>> _fetchHistory() async {

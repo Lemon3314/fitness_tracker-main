@@ -1,10 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+// 引入你的各個 Screen 檔案
 import 'screens/badge_screen.dart';
 import 'screens/history_screen.dart'; 
 import 'screens/analysis_screen.dart';
 import 'screens/home_screen.dart';
+
+// 引入剛抽離出來的 Drawer
+import 'package:fitness_tracker/widget/dev_drawer.dart';
 
 void main() => runApp(MaterialApp(
   home: MyStepTracker(),
@@ -110,37 +115,15 @@ class _MyStepTrackerState extends State<MyStepTracker> {
       
       // 傳入一個布林值，告訴分析頁它現在是不是「主角」
       AnalysisScreen(isCurrentPage: _curIndex == 2),
-      HistoryScreen(), // 歷史頁（目前是空的）
+      HistoryScreen(isActive: _curIndex == 3,), // 歷史頁（目前是空的）
     ];
 
-
     return Scaffold(
-
       // 加入這個：右側滑出的 Drawer，並限制寬度
-      endDrawer: Drawer(
-        width: MediaQuery.of(context).size.width * 0.55, // 限制寬度為螢幕的 55%
-        child: SafeArea(
-          child: Column(
-            children: [
-              ListTile(
-                title: Text("開發測試面板", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent)),
-                leading: Icon(Icons.bug_report, color: Colors.greenAccent),
-              ),
-              Divider(),
-              ListTile(
-                leading: Icon(Icons.edit),
-                title: Text("設定步數"),
-                onTap: () => _showSetStepsDialog(context),
-              ),
-              ListTile(
-                leading: Icon(Icons.calendar_month),
-                title: Text("模擬指定日期跨日"),
-                subtitle: Text("自選存檔日期", style: TextStyle(fontSize: 12)),
-                onTap: () => _pickSimulateDate(context), // 改用選日期的方法
-              ),
-            ],
-          ),
-        ),
+      // 這裡呼叫我們拆分出去的 DevDrawer，並把需要修改 state 的方法當作參數傳進去
+      endDrawer: DevDrawer(
+        onSetSteps: _setTargetSteps,
+        onSimulateNextDay: _simulateNextDay,
       ),
 
       // 使用 IndexedStack 像疊盤子一樣切換頁面，效能最好
@@ -169,68 +152,6 @@ class _MyStepTrackerState extends State<MyStepTracker> {
           BottomNavigationBarItem(icon: Icon(Icons.history), label: "歷史"),
         ],
       ),
-
-
     );
-  }
-
-  // 顯示輸入步數的對話框
-  void _showSetStepsDialog(BuildContext context) {
-    TextEditingController controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text("設定當天步數"),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(hintText: "請輸入任意步數..."),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text("取消"),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                int val = int.tryParse(controller.text) ?? 0;
-                _setTargetSteps(val);
-                Navigator.pop(context); // 關閉對話框
-                Navigator.pop(context); // 關閉側邊欄
-              },
-              child: Text("確認"),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-
-  void _pickSimulateDate(BuildContext context) async {
-    // 彈出 Flutter 內建的日期選擇器
-    DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now().subtract(Duration(days: 1)), // 預設選昨天
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
-    );
-  
-
-    if (picked != null) {
-      // 格式化為 yyyy-MM-dd
-      String formattedDate = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
-      
-      // 呼叫 Native
-      await _simulateNextDay(formattedDate);
-      
-      if (!mounted) return;
-      Navigator.pop(context); // 關閉側邊欄
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("已將歷史紀錄存入 $formattedDate！")),
-      );
-    }
   }
 }
-
